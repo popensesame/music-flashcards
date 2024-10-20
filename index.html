@@ -1,0 +1,232 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>VexFlow Grid of Staves (Dynamic)</title>
+  <script src="https://unpkg.com/vexflow/releases/vexflow-debug.js"></script>
+  <style>
+    body {
+      font-family: Arial, sans-serif;
+      margin: 0;
+      padding: 0;
+    }
+
+    /* Container for the staves */
+    .page {
+      width: 8.5in;
+      height: 11in;
+      padding: 1in;
+      margin: 0 auto;
+    }
+
+    /* Grid layout: two staves per row */
+    .stave-row {
+      display: flex;
+      justify-content: space-between;
+      margin-bottom: 0.7in; /* Reduced space between rows */
+    }
+
+    .stave {
+      border: .5px solid black;
+      width: 48%; /* Fit two staves side by side */
+    }
+
+    .note-name {
+      width: 48%;
+      border: .5px solid black;
+      align-content: center;
+      text-align: center;
+      font-size: 2em;
+      height: 204px;
+    }
+
+    @media print {
+      .page {
+        padding: 0.5in;
+      }
+
+      .stave-row {
+        margin-bottom: 0.5in; /* Reduced spacing for print */
+      }
+    }
+
+    .page-break {
+      page-break-after: always;
+    }
+  </style>
+</head>
+<body>
+  <script>
+
+    const rowsPerPage = 4;
+    const notes = [ 'c', 'd', 'e', 'f', 'g', 'a', 'b' ];
+
+    // c/4 => { note: 'c', octave: 4 }
+    function getNoteFromNoteStr(noteStr) {
+      const [ pitch, octave ] = noteStr.split('/');
+      return { pitch: pitch, octave: octave };
+    }
+
+    function getNoteStr(note) {
+      return `${note.pitch}/${note.octave}`;
+    }
+
+    function getNextPitch(pitch) {
+      if (pitch === 'b') {
+        return 'c';
+      } else {
+        return notes[notes.indexOf(pitch)+1];
+      }
+    }
+
+    function getNextNote(note) {
+      return {
+        pitch: getNextPitch(note.pitch),
+        octave: note.pitch === 'b' ? `${Number(note.octave)+1}` : note.octave
+      };
+    }
+
+    function generateRange(lowNoteStr, highNoteStr) {
+      const lowNote = getNoteFromNoteStr(lowNoteStr);
+      const highNote = getNoteFromNoteStr(highNoteStr);
+      let note = lowNote;
+      const range = [ lowNote ];
+      while (true) {
+        if (note.pitch === highNote.pitch && note.octave === highNote.octave) {
+          break;
+        }
+        note = getNextNote(note);
+        range.push(note);
+      }
+      return range;
+    }
+
+    function generateTrebleClefRange() {
+      const range = generateRange('e/3', 'c/6');
+      return range;
+    }
+
+    function generateBassClefRange() {
+      const range = generateRange('e/1', 'g/4');
+      return range;
+    }
+
+    function addPageBreak(div) {
+      const pageBreak = document.createElement('div');
+      pageBreak.classList.add('page-break');
+      div.appendChild(pageBreak);
+    }
+
+    const VF = Vex.Flow;
+
+    // Function to create a stave and render it
+    function createStave(elementId, clef = "treble", noteKey = "c/4") {
+      const div = document.getElementById(elementId);
+      const renderer = new VF.Renderer(div, VF.Renderer.Backends.SVG);
+
+      // Set up stave dimensions
+      renderer.resize(400, 200); // Width and height of each stave
+      const context = renderer.getContext();
+      const stave = new VF.Stave(10, 40, 350); // Adjust width and position
+
+      // Add clef and draw the stave
+      stave.addClef(clef).setContext(context).draw();
+
+      // Create a simple note
+      const notes = [
+        new VF.StaveNote({
+          clef: clef,
+          keys: [noteKey],
+          duration: "q"
+        })
+      ];
+
+      // Create a voice and format the notes
+      const voice = new VF.Voice({ num_beats: 1, beat_value: 4 });
+      voice.addTickables(notes);
+
+      new VF.Formatter().joinVoices([voice]).format([voice], 350);
+      voice.draw(context, stave);
+    }
+
+    function addStave(clef, noteStr, staveRow) {
+      const stave = document.createElement('div');
+      stave.classList.add('stave');
+      stave.id = `stave-${clef}-${noteStr}`;
+      staveRow.appendChild(stave);
+      createStave(stave.id, clef, noteStr);
+    }
+
+
+    // Function to generate rows of staves dynamically
+    function generateStaveRows(clef, range, page) {
+
+      for (let i = 0; i < range.length; i=i+2) {
+        // Create a new row container for two staves
+        const staveRow = document.createElement("div");
+        staveRow.classList.add("stave-row");
+        page.appendChild(staveRow);
+
+        addStave(clef, range[i], staveRow);
+        if (i !== range.length-1) {
+          addStave(clef, range[i+1], staveRow);
+        }
+      }
+    }
+
+    function addNoteName(noteStr, staveRow) {
+      const note = document.createElement('div');
+      note.classList.add('note-name');
+      note.innerHTML = noteStr.split('/').join('').toUpperCase();
+      staveRow.appendChild(note);
+    }
+
+    function generateNoteNames(range, page) {
+
+      for (let i = 0; i < range.length; i=i+2) {
+        // Create a new row container for two staves
+        const noteRow = document.createElement("div");
+        noteRow.classList.add("stave-row");
+        page.appendChild(noteRow);
+
+        addNoteName(range[i], noteRow);
+        if (i !== range.length-1) {
+          addNoteName(range[i+1], noteRow);
+        }
+      }
+    }
+
+    function addPage() {
+      const body = document.querySelector('body');
+      const page = document.createElement('div');
+      page.classList.add('page');
+      body.appendChild(page);
+      addPageBreak(body);
+      return page;
+    }
+
+    function generateDoubleSidedCardPage(clef, subRange) {
+      const stavePage = addPage();
+      const noteNamePage = addPage();
+      generateStaveRows(clef, subRange, stavePage);
+      generateNoteNames(subRange, noteNamePage);
+    }
+
+    function generateCardSet(clef, range) {
+
+      // two notes per row so multiply by 2
+      for (let i = 0; i < range.length; i=i+rowsPerPage*2) {
+        generateDoubleSidedCardPage(clef, range.slice(i, i+rowsPerPage*2));
+      }
+    }
+
+    const trebleRange = generateTrebleClefRange().map(getNoteStr);
+    generateCardSet('treble', trebleRange);
+
+    const bassRange = generateBassClefRange().map(getNoteStr);
+    generateCardSet('bass', bassRange);
+
+  </script>
+</body>
+</html>
