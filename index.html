@@ -190,9 +190,10 @@
         noteRow.classList.add("stave-row");
         page.appendChild(noteRow);
 
-        addNoteName(range[i], noteRow);
+        // switch i and i+1 here to account for the mirroring on double-sided paper
+        addNoteName(range[i+1], noteRow);
         if (i !== range.length-1) {
-          addNoteName(range[i+1], noteRow);
+          addNoteName(range[i], noteRow);
         }
       }
     }
